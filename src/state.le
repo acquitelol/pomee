@@ -1,0 +1,159 @@
+use std/prelude;
+use std/raylib;
+
+use util;
+use note;
+
+global pub;
+
+struct State {
+    Note[] notes,
+    Music music,
+    i32 combo,
+    i32 time
+}
+
+fn State::update_music(State *self) {
+    rl::update_music_stream(self.music);
+    music_time := rl::get_music_time_played(self.music);
+    music_length := rl::get_music_time_length(self.music);
+
+    if music_time >= music_length - 0.1 {
+        rl::stop_music_stream(self.music);
+    }
+
+    if rl::is_music_stream_playing(self.music) {
+        self.time = #cast(i32, music_time * 1000);
+    }
+}
+
+fn State::handle_inputs(State *self) {
+    for lane, key in LANE_KEYS.iter().enumerate() {
+        if rl::is_key_down(key) {
+            best_index := None<u64>();
+            best_offset := Config::MaxHitOffset + 1;
+
+            for i, note in self.notes.iter().enumerate() {
+                if note.hit || note.lane != lane { continue; }
+
+                offset := self.time - note.spawn_time;
+                abs_offset := math::abs(offset);
+
+                if abs_offset <= Config::MaxHitOffset && abs_offset < best_offset {
+                    best_index = Some(i);
+                    best_offset = abs_offset;
+                }
+            }
+
+            if _, i := best_index {
+                offset := self.time - self.notes[i].spawn_time;
+
+                if self.notes[i].type == NoteType::Hold {
+                    (&self.notes[i]).hit = true;
+                    (&self.notes[i]).hit_offset = offset;
+                    (&self.notes[i]).hit_time = self.time;
+                    // combo will go up when the hold is completed later
+                } else {
+                    (&self.notes[i]).hit = true;
+                    (&self.notes[i]).hit_offset = offset;
+                    (&self.notes[i]).hit_time = self.time;
+                    self.combo += 1;
+                }
+            }
+        }
+    }
+
+    for note in self.notes.iter_ref() {
+        if note.type == NoteType::Hold && note.hit && !note.fulfilled {
+            hold_end := note.spawn_time + note.duration;
+
+            if self.time < hold_end && !rl::is_key_down(LANE_KEYS[note.lane]) {
+                note.hit = false;
+                self.combo = 0;
+            }
+
+            if self.time >= hold_end {
+                self.combo += 1;
+                note.fulfilled = true;
+            }
+        }
+    }
+}
+
+fn State::draw_judgement_line(State *self) {
+    rl::draw_rectangle(0, Config::TargetY, Screen::Width, Layout::LaneHeight, DARKGRAY);
+
+    for i, lane in LANE_KEYS.iter().enumerate() {
+        x := (i + 1) * Layout::LaneWidth;
+        is_pressed := rl::is_key_down(lane);
+        color := rl::color_alpha(PINK, is_pressed ? 0.6 : 0.3);
+        rl::draw_rectangle(x, Config::TargetY, Layout::LaneWidth, Layout::LaneHeight, color);
+    }
+}
+
+fn State::draw_notes(State *self) {
+    for note in self.notes {
+        dt := note.spawn_time - self.time;
+        if note.hit && note.type != NoteType::Hold { continue; }
+
+        x := (note.lane + 1) * Layout::LaneWidth;
+        y := Config::TargetY - (dt * Config::TargetY / Config::NoteTravelTime);
+
+        if note.type == NoteType::Hold {
+            hold_end_time := note.spawn_time + note.duration;
+            dt_end := hold_end_time - self.time;
+            y_end := Config::TargetY - (dt_end * Config::TargetY / Config::NoteTravelTime);
+
+            height := y - y_end;
+            rl::draw_rectangle(x, y_end, 100, height, note.hit && !note.fulfilled ? PURPLE : DARKPURPLE);
+        } else {
+            rl::draw_rectangle(x, y, 100, 20, PINK);
+        }
+    }
+}
+
+fn State::draw_judgements(State *self) {
+    for note in self.notes {
+        if !note.hit {
+            miss_age := self.time - note.spawn_time;
+
+            if miss_age > Config::MaxHitOffset && miss_age < Config::MaxHitOffset + Layout::FadeOutTime {
+                alpha := math::max(255 - ((miss_age - Config::MaxHitOffset) * 255 / Layout::FadeOutTime), 0);
+
+                text := "MISS";
+                text_width := rl::measure_text(text, FontSize::Judgement);
+
+                x := (note.lane + 1) * 100;
+                text_x := x + 50 - (text_width / 2);
+                miss_color := rl::color_alpha(DARKGRAY, #cast(f32, alpha) / 255.0);
+                rl::draw_text(text, text_x, Config::TargetY - 40, FontSize::Judgement, miss_color);
+
+                self.combo = 0; // reset combo; there was a missed note
+            }
+
+            continue;
+        }
+
+        showTime := self.time - note.spawn_time - note.hit_offset;
+        if showTime > Layout::FadeOutTime { continue; }
+
+        alpha := math::max(255 - (showTime * 255 / Layout::FadeOutTime), 0);
+        text, color := get_judgement_info(note.hit_offset);
+        fade_color := rl::color_alpha(color, #cast(f32, alpha) / 255.0);
+        text_width := rl::measure_text(text, FontSize::Judgement);
+
+        x := (note.lane + 1) * Layout::LaneWidth;
+        lane_center := x + (Layout::LaneWidth / 2);
+        text_x := lane_center - (text_width / 2);
+
+        rl::draw_text(text, text_x, Config::TargetY - 40, FontSize::Judgement, fade_color);
+    }
+}
+
+fn State::draw_combo(State *self) {
+    if self.combo > 0 {
+        text := "{}".format(self.combo);
+        text_width := rl::measure_text(text, FontSize::Combo);
+        rl::draw_text(text, (Screen::Width / 2) - (text_width / 2), Layout::ComboY, FontSize::Combo, RAYWHITE);
+    }
+}

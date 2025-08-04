@@ -1,0 +1,48 @@
+use std/prelude;
+use std/raylib;
+global pub;
+
+enum Config {
+    TargetY = 700,
+    NoteTravelTime = 1000,
+    MaxHitOffset = 150,
+}
+
+enum Layout {
+    FadeOutTime = 500,
+    LaneWidth = 100,
+    LaneHeight = 20,
+    ComboY = 100
+}
+
+enum FontSize {
+    Judgement = 12,
+    Combo = 40
+}
+
+enum Screen {
+    Width = 600,
+    Height = 800
+}
+
+enum Judgement {
+    Perfect = 60,
+    Great = 100,
+    Good = 150,
+    Bad
+}
+
+fn get_judgement_info(i32 offset) {
+    i32 abs = math::abs(offset);
+    if abs <= Judgement::Perfect { return $("PERFECT", SKYBLUE); }
+    if abs <= Judgement::Great { return $("GREAT", VIOLET); }
+    if abs <= Judgement::Good { return $("GOOD", LIME); }
+    return $("BAD", RED);
+}
+
+const LANE_KEYS = [
+    KeyboardKey::KEY_D,
+    KeyboardKey::KEY_F,
+    KeyboardKey::KEY_J,
+    KeyboardKey::KEY_K
+];

@@ -1,0 +1,47 @@
+use std/prelude;
+use std/raylib;
+
+use state;
+use util;
+
+fn main() {
+    rl::init_window(Screen::Width, Screen::Height, "Pomee");
+    defer rl::close_window();
+
+    rl::init_audio_device();
+    defer rl::close_audio_device();
+
+    song_name := "floating_away_on_a_cloud2";
+    rl::set_target_fps(60);
+
+    state := State {
+        notes = io::read_to_string("charts/{}.pom".format(song_name))
+            .split("\n")
+            .iter()
+            .map(fn(x) x.split(" ").map(i32::parse))
+            .map(Note::from_i32s)
+            .collect(),
+        music = rl::load_music_stream("music/{}.wav".format(song_name)),
+        combo = 0,
+        time = 0,
+    };
+
+    defer rl::unload_music_stream(state.music);
+    rl::play_music_stream(state.music);
+
+    while !rl::window_should_close() {
+        state.update_music();
+        state.handle_inputs();
+
+        rl::begin_drawing();
+        rl::clear_background(BLACK);
+
+        state.draw_judgement_line();
+        state.draw_notes();
+        state.draw_judgements();
+        state.draw_combo();
+
+        rl::draw_fps(8, 8);
+        rl::end_drawing();
+    }
+}

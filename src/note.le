@@ -1,0 +1,31 @@
+use std/prelude;
+global pub;
+
+enum NoteType {
+    Single,
+    Hold
+}
+
+struct Note {
+    NoteType type,
+    i32 spawn_time,
+    i32 lane,
+    i32 hit_offset,
+    i32 hit_time,
+    i32 duration,   // if NoteType == Hold
+    bool fulfilled, // if NoteType == Hold
+    bool hit,
+}
+
+fn Note::from_i32s(i32[] parts) {
+    return Note {
+        type = parts[0],
+        spawn_time = parts[1],
+        lane = parts[2],
+        hit_offset = 0,
+        hit_time = 0,
+        duration = #cast(NoteType, parts[0]) == NoteType::Hold ? parts[3] : 0,
+        fulfilled = false,
+        hit = false,
+    };
+}
