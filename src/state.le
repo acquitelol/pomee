@@ -48,15 +48,12 @@ fn State::handle_inputs(State *self) {
             if _, i := best_index {
                 offset := self.time - self.notes[i].spawn_time;
 
-                if self.notes[i].type == NoteType::Hold {
-                    (&self.notes[i]).hit = true;
-                    (&self.notes[i]).hit_offset = offset;
-                    (&self.notes[i]).hit_time = self.time;
-                    // combo will go up when the hold is completed later
-                } else {
-                    (&self.notes[i]).hit = true;
-                    (&self.notes[i]).hit_offset = offset;
-                    (&self.notes[i]).hit_time = self.time;
+                (&self.notes[i]).hit = true;
+                (&self.notes[i]).hit_offset = offset;
+                (&self.notes[i]).hit_time = self.time;
+
+                // combo will go up when the hold is completed later
+                if self.notes[i].type != NoteType::Hold {
                     self.combo += 1;
                 }
             }
