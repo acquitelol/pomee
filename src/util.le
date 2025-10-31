@@ -4,20 +4,23 @@ global pub;
 
 enum Config {
     TargetY = 700,
-    NoteTravelTime = 1000,
     MaxHitOffset = 150,
 }
 
 enum Layout {
-    FadeOutTime = 500,
+    FadeOutTime = 1000,
     LaneWidth = 100,
     LaneHeight = 20,
-    ComboY = 100
+    ComboY = 100,
+    ButtonPadding = 80
 }
 
 enum FontSize {
-    Judgement = 12,
-    Combo = 40
+    Judgement = 20,
+    Combo = 40,
+    Title = 80,
+    Subtitle = 40,
+    ButtonText = 30
 }
 
 enum Screen {
@@ -33,11 +36,11 @@ enum Judgement {
 }
 
 fn get_judgement_info(i32 offset) {
-    i32 abs = math::abs(offset);
-    if abs <= Judgement::Perfect { return $("PERFECT", SKYBLUE); }
-    if abs <= Judgement::Great { return $("GREAT", VIOLET); }
-    if abs <= Judgement::Good { return $("GOOD", LIME); }
-    return $("BAD", RED);
+    abs := math::abs(offset);
+    if abs <= Judgement::Perfect { return $$("PERFECT", PINK, SKYBLUE); }
+    if abs <= Judgement::Great { return $$("GREAT", VIOLET, VIOLET); }
+    if abs <= Judgement::Good { return $$("GOOD", SKYBLUE, SKYBLUE); }
+    return $$("BAD", RED, RED);
 }
 
 const LANE_KEYS = [

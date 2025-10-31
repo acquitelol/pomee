@@ -1,0 +1,28 @@
+use std/raylib;
+
+use note;
+global pub;
+
+struct Song {
+    string readable_name,
+    string name,
+    Music music,
+    Note[] notes,
+    i32 speed,
+}
+
+fn Song::new(string readable_name, string name) {
+    parts := io::read_to_string("charts/{}.pom".format(name))
+        .split("\n")
+        .iter()
+        .map(fn(x) x.split(" ").map(i32::parse));
+    speed := parts.next().unwrap()[0];
+
+    return Song {
+        readable_name = readable_name,
+        name = name,
+        music = rl::load_music_stream("music/{}.wav".format(name)),
+        notes = parts.map(Note::from_i32s).collect(),
+        speed = speed
+    };
+}

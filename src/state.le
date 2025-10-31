@@ -3,37 +3,96 @@ use std/raylib;
 
 use util;
 use note;
+use song;
+use button;
 
 global pub;
 
+enum StateKind {
+    Menu,
+    Song
+}
+
 struct State {
-    Note[] notes,
-    Music music,
+    StateKind state,
+    Song[] songs,
+    @unused Option<Song> current,
+    RenderTexture2D target,
+    Sound click,
     i32 combo,
     i32 time
 }
 
-fn State::update_music(State *self) {
-    rl::update_music_stream(self.music);
-    music_time := rl::get_music_time_played(self.music);
-    music_length := rl::get_music_time_length(self.music);
+fn State::set_current(State *self, u64 index) {
+    current := self.songs[index];
+    rl::stop_music_stream(current.music);
 
-    if music_time >= music_length - 0.1 {
-        rl::stop_music_stream(self.music);
+    current.notes = current.notes.clone();
+    self.current = Some(current);
+    self.combo = 0;
+}
+
+fn State::draw_menu(State *self) {
+    title := "Pomee";
+    width := rl::measure_text(title, FontSize::Title);
+
+    rl::draw_text(
+        title,
+        (Screen::Width - width) / 2,
+        100, FontSize::Title, WHITE
+    );
+
+    subtitle := "Pick a song:";
+    width := rl::measure_text(subtitle, FontSize::Subtitle);
+
+    rl::draw_text(
+        subtitle,
+        (Screen::Width - width) / 2,
+        200, FontSize::Subtitle, WHITE
+    );
+
+    width := self.songs
+        .iter()
+        .map(fn(song) rl::measure_text(song.readable_name, FontSize::ButtonText))
+        .max()
+        .unwrap();
+
+    for i, song in self.songs.iter().enumerate() {
+        render_button(song.readable_name, width, i * 1.25, $(self, i), fn(ctx) {
+            self, i := ctx;
+            self.set_current(i);
+            self.state = StateKind::Song;
+            rl::play_music_stream(self.current.unwrap().music);
+        });
     }
+}
 
-    if rl::is_music_stream_playing(self.music) {
-        self.time = #cast(i32, music_time * 1000);
+fn State::update_music(State *self) {
+    if _, song := self.current {
+        rl::update_music_stream(song.music);
+        music_time := rl::get_music_time_played(song.music);
+        music_length := rl::get_music_time_length(song.music);
+
+        if music_time >= music_length - 0.1 {
+            rl::stop_music_stream(song.music);
+            self.state = StateKind::Menu;
+        }
+
+        if rl::is_music_stream_playing(song.music) {
+            self.time = #cast(i32, music_time * 1000);
+        }
     }
 }
 
 fn State::handle_inputs(State *self) {
     for lane, key in LANE_KEYS.iter().enumerate() {
-        if rl::is_key_down(key) {
+        if rl::is_key_pressed(key) && _, song := self.current {
+            rl::play_sound(self.click); // the click sound should happen whenever you click any lane
+
             best_index := None<u64>();
             best_offset := Config::MaxHitOffset + 1;
 
-            for i, note in self.notes.iter().enumerate() {
+            for i, note in song.notes.iter().enumerate() {
                 if note.hit || note.lane != lane { continue; }
 
                 offset := self.time - note.spawn_time;
@@ -46,32 +105,34 @@ fn State::handle_inputs(State *self) {
             }
 
             if _, i := best_index {
-                offset := self.time - self.notes[i].spawn_time;
+                offset := self.time - song.notes[i].spawn_time;
 
-                (&self.notes[i]).hit = true;
-                (&self.notes[i]).hit_offset = offset;
-                (&self.notes[i]).hit_time = self.time;
+                (&song.notes[i]).hit = true;
+                (&song.notes[i]).hit_offset = offset;
+                (&song.notes[i]).hit_time = self.time;
 
                 // combo will go up when the hold is completed later
-                if self.notes[i].type != NoteType::Hold {
+                if song.notes[i].type != NoteType::Hold {
                     self.combo += 1;
                 }
             }
         }
     }
 
-    for note in self.notes.iter_ref() {
-        if note.type == NoteType::Hold && note.hit && !note.fulfilled {
-            hold_end := note.spawn_time + note.duration;
+    if _, song := self.current {
+        for note in song.notes.iter_ref() {
+            if note.type == NoteType::Hold && note.hit && !note.fulfilled {
+                hold_end := note.spawn_time + note.duration;
 
-            if self.time < hold_end && !rl::is_key_down(LANE_KEYS[note.lane]) {
-                note.hit = false;
-                self.combo = 0;
-            }
+                if self.time < hold_end && !rl::is_key_down(LANE_KEYS[note.lane]) {
+                    note.hit = false;
+                    self.combo = 0;
+                }
 
-            if self.time >= hold_end {
-                self.combo += 1;
-                note.fulfilled = true;
+                if self.time >= hold_end {
+                    self.combo += 1;
+                    note.fulfilled = true;
+                }
             }
         }
     }
@@ -89,61 +150,139 @@ fn State::draw_judgement_line(State *self) {
 }
 
 fn State::draw_notes(State *self) {
-    for note in self.notes {
-        dt := note.spawn_time - self.time;
-        if note.hit && note.type != NoteType::Hold { continue; }
+    if _, song := self.current {
+        for note in song.notes {
+            dt := note.spawn_time - self.time;
+            if note.hit && note.type != NoteType::Hold { continue; }
 
-        x := (note.lane + 1) * Layout::LaneWidth;
-        y := Config::TargetY - (dt * Config::TargetY / Config::NoteTravelTime);
+            x := (note.lane + 1) * Layout::LaneWidth;
+            y := Config::TargetY - (dt * Config::TargetY / song.speed);
 
-        if note.type == NoteType::Hold {
-            hold_end_time := note.spawn_time + note.duration;
-            dt_end := hold_end_time - self.time;
-            y_end := Config::TargetY - (dt_end * Config::TargetY / Config::NoteTravelTime);
+            if note.type == NoteType::Hold {
+                hold_end_time := note.spawn_time + note.duration;
+                dt_end := hold_end_time - self.time;
+                y_end := Config::TargetY - (dt_end * Config::TargetY / song.speed);
 
-            height := y - y_end;
-            rl::draw_rectangle(x, y_end, 100, height, note.hit && !note.fulfilled ? PURPLE : DARKPURPLE);
-        } else {
-            rl::draw_rectangle(x, y, 100, 20, PINK);
+                height := y - y_end;
+                rl::draw_rectangle(x, y_end, 100, height, note.hit && !note.fulfilled ? PURPLE : DARKPURPLE);
+            } else {
+                rl::draw_rectangle(x, y, 100, 20, PINK);
+            }
         }
     }
 }
 
 fn State::draw_judgements(State *self) {
-    for note in self.notes {
-        if !note.hit {
-            miss_age := self.time - note.spawn_time;
+    if _, song := self.current {
+        latest_note := None<Note>();
+        latest_time := -1;
+        is_miss := false;
 
-            if miss_age > Config::MaxHitOffset && miss_age < Config::MaxHitOffset + Layout::FadeOutTime {
-                alpha := math::max(255 - ((miss_age - Config::MaxHitOffset) * 255 / Layout::FadeOutTime), 0);
+        for note in song.notes {
+            if note.hit {
+                show_time := self.time - note.hit_time;
+                if show_time > Layout::FadeOutTime { continue; }
 
-                text := "MISS";
-                text_width := rl::measure_text(text, FontSize::Judgement);
+                if note.hit_time > latest_time {
+                    latest_note = Some(note);
+                    latest_time = note.hit_time;
+                    is_miss = false;
+                }
+            } else {
+                miss_age := self.time - note.spawn_time;
+                if miss_age < Config::MaxHitOffset { continue; }
+                if miss_age > Config::MaxHitOffset + Layout::FadeOutTime { continue; }
 
-                x := (note.lane + 1) * 100;
-                text_x := x + 50 - (text_width / 2);
-                miss_color := rl::color_alpha(DARKGRAY, #cast(f32, alpha) / 255.0);
-                rl::draw_text(text, text_x, Config::TargetY - 40, FontSize::Judgement, miss_color);
-
-                self.combo = 0; // reset combo; there was a missed note
+                if note.spawn_time > latest_time {
+                    latest_note = Some(note);
+                    latest_time = note.spawn_time;
+                    is_miss = true;
+                }
             }
-
-            continue;
         }
 
-        showTime := self.time - note.spawn_time - note.hit_offset;
-        if showTime > Layout::FadeOutTime { continue; }
+        if _, note := latest_note {
+            if is_miss {
+                show_time := self.time - note.spawn_time - Config::MaxHitOffset;
+                alpha := math::max(255 - (show_time * 255 / Layout::FadeOutTime), 0);
+                fade_color := rl::color_alpha(DARKGRAY, #cast(f32, alpha) / 255.0);
+                text := "MISS";
+                text_width := rl::measure_text(text, FontSize::Judgement);
+                text_x := (Screen::Width / 2) - (text_width / 2);
 
-        alpha := math::max(255 - (showTime * 255 / Layout::FadeOutTime), 0);
-        text, color := get_judgement_info(note.hit_offset);
-        fade_color := rl::color_alpha(color, #cast(f32, alpha) / 255.0);
-        text_width := rl::measure_text(text, FontSize::Judgement);
+                rl::draw_text(text, text_x, Config::TargetY - FontSize::Judgement * 3, FontSize::Judgement, fade_color);
+                self.combo = 0; // reset combo on miss
+            } else {
+                show_time := self.time - note.hit_time;
+                fade_delay := 200;
+                alpha := 255;
 
-        x := (note.lane + 1) * Layout::LaneWidth;
-        lane_center := x + (Layout::LaneWidth / 2);
-        text_x := lane_center - (text_width / 2);
+                if show_time >= fade_delay {
+                    fade_time := show_time - fade_delay;
+                    alpha = math::max(0, 255 - (fade_time * 255 / (Layout::FadeOutTime)));
+                }
 
-        rl::draw_text(text, text_x, Config::TargetY - 40, FontSize::Judgement, fade_color);
+                text, start, end := get_judgement_info(note.hit_offset);
+
+                if text == "GOOD" || text == "BAD" {
+                    self.combo = 0; // also reset combo on bad inputs, preventing spam
+                }
+
+                text_alpha := rl::color_alpha(WHITE, #cast(f32, alpha) / 255.0);
+                text_width := rl::measure_text(text, FontSize::Judgement);
+
+                x := (Screen::Width / 2) - (text_width / 2);
+                y := Config::TargetY - FontSize::Judgement * 3;
+
+                rl::begin_texture_mode(self.target);
+                    rl::clear_background(BLANK);
+                    rl::draw_text(text, x, y, FontSize::Judgement, text_alpha);
+                rl::end_texture_mode();
+
+                // the first draw was committed to the texture
+                rl::begin_texture_mode(self.target);
+                    rl::draw_texture_pro(self.target.texture,
+                        Rectangle {
+                            x = 0, y = 0,
+                            width = self.target.texture.width,
+                            height = -self.target.texture.height
+                        },
+                        Rectangle {
+                            x = 0, y = 0,
+                            width = self.target.texture.width,
+                            height = self.target.texture.height
+                        },
+                        Vector2 { x = 0, y = 0 },
+                        0, WHITE
+                    );
+
+                    rl::begin_blend_mode(BlendMode::BLEND_MULTIPLIED);
+                        rl::draw_rectangle_gradient_v(
+                            x, y, text_width,
+                            FontSize::Judgement,
+                            start, end
+                        );
+                    rl::end_blend_mode();
+                rl::end_texture_mode();
+
+                rl::draw_texture_pro(self.target.texture,
+                    Rectangle {
+                        x = 0, y = 0,
+                        width = self.target.texture.width,
+                        height = -self.target.texture.height
+                    },
+                    Rectangle {
+                        x = 0, y = 0,
+                        width = self.target.texture.width,
+                        height = self.target.texture.height
+                    },
+                    Vector2 { x = 0, y = 0 },
+                    0, WHITE
+                );
+
+                //rl::draw_text(text, text_x, text_y, FontSize::Judgement, fade_color);
+            }
+        }
     }
 }
 

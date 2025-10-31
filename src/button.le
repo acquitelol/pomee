@@ -1,0 +1,33 @@
+use std/raylib;
+
+use util;
+global pub;
+
+fn render_button<T, U>(string text, i32 width, f32 y_offset, U counter, fn(U) -> T action) {
+    mouse_pos := rl::get_mouse_position();
+    button := Rectangle {
+        x = (Screen::Width - width - Layout::ButtonPadding) / 2.0,
+        y = (Screen::Height + FontSize::ButtonText * 4 * y_offset - 100) / 2.0,
+        width = width + Layout::ButtonPadding,
+        height = FontSize::ButtonText * 2
+    };
+
+    hovering := rl::elle_check_collision_point_rec(mouse_pos, button);
+    button_color := rl::color_alpha(PINK, hovering ? 0.7 : 0.5);
+
+    if hovering && rl::is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+        action(counter);
+    }
+
+    width := rl::measure_text(text, FontSize::ButtonText);
+
+    rl::draw_rectangle_rec(button, button_color);
+    rl::draw_rectangle_lines_ex(button, 2, BLACK);
+    rl::draw_text(
+        text,
+        (Screen::Width - width) / 2.0,
+        button.y + FontSize::ButtonText / 2,
+        FontSize::ButtonText,
+        WHITE
+    );
+}
