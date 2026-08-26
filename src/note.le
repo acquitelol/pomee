@@ -8,7 +8,7 @@ enum NoteType {
 
 struct Note {
     NoteType type,
-    i32 spawn_time,
+    i32 offset,
     i32 lane,
     i32 hit_offset,
     i32 hit_time,
@@ -17,18 +17,24 @@ struct Note {
     bool hit,
 }
 
-fn Note::from_i32s(i32[] parts) {
-    if #cast(NoteType, parts[0]) == NoteType::Hold {
-        $assert(parts.len() == 4);
+fn NoteType::from<T>(T x) {
+    return #cast(NoteType, #cast(i32, x));
+}
+
+fn Note::from_json(JsonValue res) {
+    type := NoteType::from(res["type"].as_number());
+    
+    if type == NoteType::Hold {
+        $assert(res.as_object().contains_key("duration"));
     }
     
     return Note {
-        type = parts[0],
-        spawn_time = parts[1],
-        lane = parts[2],
+        type,
+        offset = res["offset"].as_number(),
+        lane = res["lane"].as_number(),
         hit_offset = 0,
         hit_time = 0,
-        duration = #cast(NoteType, parts[0]) == NoteType::Hold ? parts[3] : 0,
+        duration = type == NoteType::Hold ? res["duration"].as_number() : 0,
         fulfilled = false,
         hit = false,
     };

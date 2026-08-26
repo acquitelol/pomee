@@ -95,7 +95,7 @@ fn State::handle_inputs(State *self) {
             for i, note in song.notes.iter().enumerate() {
                 if note.hit || note.lane != lane { continue; }
 
-                offset := self.time - note.spawn_time;
+                offset := self.time - note.offset;
                 abs_offset := math::abs(offset);
 
                 if abs_offset <= Config::MaxHitOffset && abs_offset < best_offset {
@@ -105,7 +105,7 @@ fn State::handle_inputs(State *self) {
             }
 
             if _, i := best_index {
-                offset := self.time - song.notes[i].spawn_time;
+                offset := self.time - song.notes[i].offset;
 
                 (&song.notes[i]).hit = true;
                 (&song.notes[i]).hit_offset = offset;
@@ -122,7 +122,7 @@ fn State::handle_inputs(State *self) {
     if _, song := self.current {
         for note in song.notes.iter_ref() {
             if note.type == NoteType::Hold && note.hit && !note.fulfilled {
-                hold_end := note.spawn_time + note.duration;
+                hold_end := note.offset + note.duration;
 
                 if self.time < hold_end && !rl::is_key_down(LANE_KEYS[note.lane]) {
                     note.hit = false;
@@ -152,14 +152,14 @@ fn State::draw_judgement_line(State *self) {
 fn State::draw_notes(State *self) {
     if _, song := self.current {
         for note in song.notes {
-            dt := note.spawn_time - self.time;
+            dt := note.offset - self.time;
             if note.hit && note.type != NoteType::Hold { continue; }
 
             x := (note.lane + 1) * Layout::LaneWidth;
             y := Config::TargetY - (dt * Config::TargetY / song.speed);
 
             if note.type == NoteType::Hold {
-                hold_end_time := note.spawn_time + note.duration;
+                hold_end_time := note.offset + note.duration;
                 dt_end := hold_end_time - self.time;
                 y_end := Config::TargetY - (dt_end * Config::TargetY / song.speed);
 
@@ -189,13 +189,13 @@ fn State::draw_judgements(State *self) {
                     is_miss = false;
                 }
             } else {
-                miss_age := self.time - note.spawn_time;
+                miss_age := self.time - note.offset;
                 if miss_age < Config::MaxHitOffset { continue; }
                 if miss_age > Config::MaxHitOffset + Layout::FadeOutTime { continue; }
 
-                if note.spawn_time > latest_time {
+                if note.offset > latest_time {
                     latest_note = Some(note);
-                    latest_time = note.spawn_time;
+                    latest_time = note.offset;
                     is_miss = true;
                 }
             }
@@ -203,7 +203,7 @@ fn State::draw_judgements(State *self) {
 
         if _, note := latest_note {
             if is_miss {
-                show_time := self.time - note.spawn_time - Config::MaxHitOffset;
+                show_time := self.time - note.offset - Config::MaxHitOffset;
                 alpha := math::max(255 - (show_time * 255 / Layout::FadeOutTime), 0);
                 fade_color := rl::color_alpha(DARKGRAY, #cast(f32, alpha) / 255.0);
                 text := "MISS";

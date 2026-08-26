@@ -12,17 +12,13 @@ struct Song {
 }
 
 fn Song::new(string readable_name, string name) {
-    parts := io::read_to_string("charts/{}.pom".format(name))
-        .split("\n")
-        .iter()
-        .map(fn(x) x.split(" ").map(i32::parse));
-    speed := parts.next().unwrap()[0];
+    res := io::read_to_string("charts/{}.json".format(name)).parse_json().unwrap();
 
     return Song {
         readable_name,
         name,
         music = rl::load_music_stream("music/{}.wav".format(name)),
-        notes = parts.map(Note::from_i32s).collect(),
-        speed
+        notes = res["notes"].as_array().map(Note::from_json),
+        speed = res["speed"].as_number()
     };
 }
