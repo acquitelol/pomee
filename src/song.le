@@ -19,10 +19,10 @@ fn Song::new(string readable_name, string name) {
     speed := parts.next().unwrap()[0];
 
     return Song {
-        readable_name = readable_name,
-        name = name,
+        readable_name,
+        name,
         music = rl::load_music_stream("music/{}.wav".format(name)),
         notes = parts.map(Note::from_i32s).collect(),
-        speed = speed
+        speed
     };
 }

@@ -18,6 +18,10 @@ struct Note {
 }
 
 fn Note::from_i32s(i32[] parts) {
+    if #cast(NoteType, parts[0]) == NoteType::Hold {
+        $assert(parts.len() == 4);
+    }
+    
     return Note {
         type = parts[0],
         spawn_time = parts[1],

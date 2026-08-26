@@ -43,7 +43,7 @@ fn get_judgement_info(i32 offset) {
     return $$("BAD", RED, RED);
 }
 
-const LANE_KEYS = [
+let LANE_KEYS = [
     KeyboardKey::KEY_D,
     KeyboardKey::KEY_F,
     KeyboardKey::KEY_J,
