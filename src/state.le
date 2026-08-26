@@ -53,13 +53,13 @@ fn State::draw_menu(State *self) {
 
     width := self.songs
         .iter()
-        .map(fn(song) rl::measure_text(song.readable_name, FontSize::ButtonText))
+        .map(fn: rl::measure_text(it.readable_name, FontSize::ButtonText))
         .max()
         .unwrap();
 
     for i, song in self.songs.iter().enumerate() {
-        render_button(song.readable_name, width, i * 1.25, $(self, i), fn(ctx) {
-            self, i := ctx;
+        render_button(song.readable_name, width, i * 1.25, $(self, i), fn: {
+            self, i := it;
             self.set_current(i);
             self.state = StateKind::Song;
             rl::play_music_stream(self.current.unwrap().music);
