@@ -5,3 +5,7 @@
 ## How to build?
 
 `ellec src/main.le --run -z -lraylib`
+
+## Preview
+
+<img src="https://github.com/acquitelol/pomee/raw/mistress/images/pomee.png?raw=1" width="240">
