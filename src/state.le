@@ -107,9 +107,9 @@ fn State::handle_inputs(State *self) {
             if _, i := best_index {
                 offset := self.time - song.notes[i].offset;
 
-                (&song.notes[i]).hit = true;
-                (&song.notes[i]).hit_offset = offset;
-                (&song.notes[i]).hit_time = self.time;
+                song.notes[i].hit = true;
+                song.notes[i].hit_offset = offset;
+                song.notes[i].hit_time = self.time;
 
                 // combo will go up when the hold is completed later
                 if song.notes[i].type != NoteType::Hold {
